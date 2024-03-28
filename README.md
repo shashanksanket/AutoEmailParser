@@ -30,7 +30,7 @@ To set up the project locally and explore its functionality, follow these steps:
 2. Install dependencies using `npm install`.
 3. Set up environment variables by creating a `.env` file and adding necessary configurations.
 4. Run the application using `npm start`.
-5. Access the application through the specified port (default: 5500) in your web browser.
+5. Access the application by clickin index.html and open it using your web browser.
 
 ## Task Completion
 
