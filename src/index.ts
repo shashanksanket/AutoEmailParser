@@ -38,7 +38,7 @@ app.use(passport.session());
 // Routes
 
 app.get('/auth/google',
-    passport.authenticate('google', { scope: ['email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify'] })
+    passport.authenticate('google', { scope: ['email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.labels'] })
 );
 
 app.get('/auth/google/callback',
@@ -55,7 +55,7 @@ app.get("/auth/google/failure", (req, res) => {
 app.get(
     "/auth/outlook",
     passport.authenticate("microsoft", {
-        scope: ["user.read", "mail.read", "mail.send","mail.ReadWrite"],
+        scope: ["user.read", "mail.read", "mail.send", "mail.ReadWrite","mailboxSettings.readWrite",""],
     })
 );
 
@@ -72,6 +72,7 @@ app.get("/auth/outlook/failure", (req, res) => {
 });
 
 app.get("/auth/success/google", isLoggedin, async (req: RequestWithUser, res: express.Response) => {
+    console.log(req)
     try {
         const accessToken = req.user.tokens.access_token;
 
@@ -81,11 +82,16 @@ app.get("/auth/success/google", isLoggedin, async (req: RequestWithUser, res: ex
         const response = await fetchAndSendEmailGoogle(oauth2Client)
 
         //Then Go To Background Task
-        cron.schedule('*/30 * * * * *', async () => {
+        let cronjob:any;
+        cronjob = cron.schedule('*/30 * * * * *', async () => {
             try {
                 const GoogleResponse = await fetchAndSendEmailGoogle(oauth2Client);
-        
-                console.log('Background task executed:', GoogleResponse);
+                if (GoogleResponse.message == "No New Mails") {
+                    cronjob.stop();
+                    console.log('Stopping Background Task No Emails left to analyze:', GoogleResponse);
+                } else {
+                    console.log('Background task executed:', GoogleResponse);
+                }
             } catch (error) {
                 console.error('Error executing background task:', error);
             }
@@ -111,17 +117,19 @@ app.get("/auth/success/outlook", isLoggedin, async (req: RequestWithUser, res: e
         const response = await fetchAndSendEmailOutlook(graph)
 
         //Then Go To Background Task
-        cron.schedule('*/30 * * * * *', async () => {
+        let cronjob:any;
+        cronjob = cron.schedule('*/30 * * * * *', async () => {
             try {
                 const outlookResponse = await fetchAndSendEmailOutlook(graph);
-        
+                if (outlookResponse.message == "No New Mails") {
+                    cronjob.stop()
+                    console.log('Background task Is stopped no new mails to analyze', outlookResponse);
+                }
                 console.log('Background task executed:', outlookResponse);
             } catch (error) {
                 console.error('Error executing background task:', error);
             }
         });
-
-
         res.json(response);
 
     } catch (error) {
@@ -137,19 +145,3 @@ app.get("*", (req, res) => {
 app.listen(5500, () => {
     console.log("Server started");
 });
-
-function generateHtmlWithUpdatedData(data: any): string {
-    // Generate HTML dynamically using the updated data
-    const html = `
-        <html>
-            <head>
-                <title>Updated Data</title>
-            </head>
-            <body>
-                <h1>Updated Data</h1>
-                <p>${data}</p>
-            </body>
-        </html>
-    `;
-    return html;
-}
