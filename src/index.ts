@@ -72,7 +72,6 @@ app.get("/auth/outlook/failure", (req, res) => {
 });
 
 app.get("/auth/success/google", isLoggedin, async (req: RequestWithUser, res: express.Response) => {
-    console.log(req)
     try {
         const accessToken = req.user.tokens.access_token;
 

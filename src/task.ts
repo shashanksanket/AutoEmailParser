@@ -23,12 +23,27 @@ const analyzeEmail = async (emailContent: string): Promise<string> => {
             messages: [
                 {
                     role: 'system',
-                    content: `aAs a recruiter, I need to automate the process of analyzing incoming emails and generating appropriate replies based on their content. Here's the task:\n1. Analyze the content of the email and determine its relevance to job inquiries.\n2. Assign a label to each email based on its relevance: [Interested, Not Interested, More Information, Others].\n3. If the email is related to job inquiries, generate a reply email with appropriate subject and body.\n4. The reply email should be in the following JSON format: {"label":"", "extractedMailContent":"", "replyMail":{"subject":"", "body":""}} .Note:extractedMailContent should have the content of mail received not html tags \n5. If the email is not related to job inquiries, ignore it and assign the label as "other".\n6. Do not generate a body for emails labeled as "other".\n7. Ensure that you use proper name to refer any person you can get names of the candidate from there emailid or inside emailcontent refer me  that is any recuruiter with any random name if you can't get a name from mail contents \n\nPrompt: Analyze the given email content and generate a reply email accordingly. Consider yourself as a recruiter receiving job inquiries and tailor the reply based on the content of the email. \n This is the email Content
-                    ${emailContent}`,
+                    content:`Consider yourself a recruiter and you need to send replies to applicants finding job at your comapny You need to categorize the mails in 4 labels ["Interested","More Information","Not Interested","Others"] .\n
+                    1.Others are those kind of mail which is not related to jobs or recruitment process in this case you need to ignore the mail no need to generate the reply just assing the label as Others\n
+                    2.Interested are those kind of mail which says that applicant is interested for the job role and whatever skills mentionend in the mail is alligning to the job profile in this kind of mail assign the label as Interested and generate reply asking them to weather they want to come on a call and also assign the label as Interested.\n
+                    3.Not Interested are those kind of mail where the applicant wants to withdraw from a recruitment process going on or he/she is not interested in a job role applied in these case generate appropriate response wishing them good luck etc also assing the label as Not Interested.\n
+                    4.More Information are those kind of mail where the candidate is interested for a job role but has not mentioned any more details about them or skills for example this mail : egarding any role I want to join your company I want to join your company. It says that he candidate is only intersted for a role in theior company but hasn't mentionend about their skills or any other profile details \n
+                    Remeber to give your resposne in following json format: \n
+                    {
+                        "label":"",
+                        "extractedMailContent":"",
+                        "replyMail":{
+                            "subject":"",
+                            "body":""
+                        }
+                    }
+                            This is the email content below: \n
+                    ${emailContent}`
                 },
             ],
             model: 'gpt-3.5-turbo',
         });
+        console.log(response.choices[0].message.content)
         return response.choices[0].message.content || "";
     } catch (error) {
         throw error;
@@ -136,20 +151,36 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
 
     const messages = await (gmail.users.messages.list as any)({ userId: 'me', maxResults: 1, q: 'is:unread', orderBy: 'date desc' });
 
-    const messageContents = messages.data?.messages ? await Promise.all(messages.data.messages.map(async (message: any) => {
+    const messageContents = await Promise.all(messages.data.messages.map(async (message: any) => {
         const messageData = await gmail.users.messages.get({ userId: 'me', id: message.id });
-        return messageData.data;
-    })) : [];
+        const payload = messageData.data.payload;
+        const subject = payload.headers.find((header)=> header.name === "Subject")?.value;
+        let content = ""
+        if (payload.parts){
+            const parts = payload.parts.find(
+                (part)=>part.mimeType = "text/plain"
+            )
+            if(parts){
+                content = Buffer.from(parts.body.data,"base64").toString("utf-8");
+            }
+        }else{
+            content = Buffer.from(payload.body.data, "base64").toString("utf-8");
+        }
+        const snippet = messageData.data.snippet
+        const body = `${subject} ${snippet} ${content} `
+        return { id: message.id, body: body };
+    }));
+
     const sentEmail: any[] = [];
     const messageReplied: string[] = [];
     for (const message of messageContents) {
-        const analyzedResponse = await analyzeEmail(message.snippet || "");
+        const analyzedResponse = await analyzeEmail(message.body || "");
+        console.log(analyzedResponse)
         const response: AnalyzedResponse = JSON.parse(analyzedResponse);
         const replyMail = response.replyMail;
         const extractedMailContent = response.extractedMailContent;
         messageReplied.push(extractedMailContent);
         if (response.label == "Interested") {
-            console.log("here")
             const labelId = await getGmailLabelId(gmail, 'Interested');
             await (gmail.users.messages.modify as any)({
                 userId: 'me',
@@ -158,7 +189,6 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
             });
         }
         else if (response.label == "Not Interested") {
-            console.log("here")
             const labelId = await getGmailLabelId(gmail, 'Not Interested');
             await (gmail.users.messages.modify as any)({
                 userId: 'me',
@@ -167,7 +197,6 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
             });
         }
         else if (response.label == "More Information") {
-            console.log("here")
             const labelId = await getGmailLabelId(gmail, 'More Information');
             await (gmail.users.messages.modify as any)({
                 userId: 'me',
@@ -176,7 +205,6 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
             });
         }
         else if (response.label == "Others") {
-            console.log("here")
             const labelId = await getGmailLabelId(gmail, 'Others');
             await (gmail.users.messages.modify as any)({
                 userId: 'me',
