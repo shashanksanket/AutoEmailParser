@@ -7,9 +7,7 @@ import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Function to initialize Microsoft Graph client
 const getGraphClient = (accessToken: string): Client => {
-    // Initialize Graph client with access token
     const client = Client.init({
         authProvider: (done) => {
             done(null, accessToken);
@@ -28,7 +26,7 @@ passport.use(
         },
         async (accessToken: string, refreshToken: any, profile: any, done: (arg0: unknown, arg1: { id: any; displayName: any; email: any; accessToken: any; } | unknown) => any) => {
             try {
-                const graphClient = getGraphClient(accessToken); // Implement a function to get Microsoft Graph client
+                const graphClient = getGraphClient(accessToken);
 
                 const userProfile = await graphClient.api('/me').get();
                 const user = {

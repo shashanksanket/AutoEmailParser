@@ -141,7 +141,7 @@ async function getGmailLabelId(gmail: gmail_v1.Gmail, labelName: string) {
 }
 
 async function addOutlookCategory(graph: Client, message: any, category: string) {
-    await graph.api(`/me/messages/${message.id}`).post({
+    await graph.api(`/me/messages/${message.id}`).patch({
         categories: [category]
     });
 }
