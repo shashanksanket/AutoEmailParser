@@ -19,16 +19,21 @@ const analyzeEmail = async (emailContent: string): Promise<string> => {
             apiKey: process.env.OPENAI_API_KEY || '',
             dangerouslyAllowBrowser: true,
         });
+
+        // Truncate emailContent to fit within the maximum allowed token length
+        const maxLength = 16385;
+        const truncatedContent = emailContent.slice(0, maxLength);
+
         const response = await openai.chat.completions.create({
             messages: [
                 {
                     role: 'system',
-                    content:`Consider yourself a recruiter and you need to send replies to applicants finding job at your comapny You need to categorize the mails in 4 labels ["Interested","More Information","Not Interested","Others"] .\n
-                    1.Others are those kind of mail which is not related to jobs or recruitment process in this case you need to ignore the mail no need to generate the reply just assing the label as Others\n
-                    2.Interested are those kind of mail which says that applicant is interested for the job role and whatever skills mentionend in the mail is alligning to the job profile in this kind of mail assign the label as Interested and generate reply asking them to weather they want to come on a call and also assign the label as Interested.\n
-                    3.Not Interested are those kind of mail where the applicant wants to withdraw from a recruitment process going on or he/she is not interested in a job role applied in these case generate appropriate response wishing them good luck etc also assing the label as Not Interested.\n
-                    4.More Information are those kind of mail where the candidate is interested for a job role but has not mentioned any more details about them or skills for example this mail : egarding any role I want to join your company I want to join your company. It says that he candidate is only intersted for a role in theior company but hasn't mentionend about their skills or any other profile details \n
-                    Remeber to give your resposne in following json format: \n
+                    content: `Consider yourself a recruiter and you need to send replies to applicants finding job at your company. You need to categorize the mails in 4 labels ["Interested","More Information","Not Interested","Others"].\n
+                    1. Others are those kind of mail which is not related to jobs or recruitment process, in this case you need to ignore the mail, no need to generate the reply just assign the label as Others.\n
+                    2. Interested are those kind of mail which says that applicant is interested for the job role and whatever skills mentioned in the mail are aligning to the job profile. In this kind of mail, assign the label as Interested and generate a reply asking them whether they want to come on a call, also assign the label as Interested.\n
+                    3. Not Interested are those kind of mail where the applicant wants to withdraw from a recruitment process going on or he/she is not interested in a job role applied. In these cases, generate an appropriate response wishing them good luck etc. also assign the label as Not Interested.\n
+                    4. More Information are those kind of mail where the candidate is interested for a job role but has not mentioned any more details about them or skills. For example, this mail: Regarding any role I want to join your company. It says that the candidate is only interested for a role in their company but hasn't mentioned about their skills or any other profile details.\n
+                    Remember to give your response in following JSON format: \n
                     {
                         "label":"",
                         "extractedMailContent":"",
@@ -37,13 +42,12 @@ const analyzeEmail = async (emailContent: string): Promise<string> => {
                             "body":""
                         }
                     }
-                            This is the email content below: \n
-                    ${emailContent}`
+                    This is the email content below: \n
+                    ${truncatedContent}`
                 },
             ],
             model: 'gpt-3.5-turbo',
         });
-        console.log(response.choices[0].message.content)
         return response.choices[0].message.content || "";
     } catch (error) {
         throw error;
@@ -154,16 +158,16 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
     const messageContents = await Promise.all(messages.data.messages.map(async (message: any) => {
         const messageData = await gmail.users.messages.get({ userId: 'me', id: message.id });
         const payload = messageData.data.payload;
-        const subject = payload.headers.find((header)=> header.name === "Subject")?.value;
+        const subject = payload.headers.find((header) => header.name === "Subject")?.value;
         let content = ""
-        if (payload.parts){
+        if (payload.parts) {
             const parts = payload.parts.find(
-                (part)=>part.mimeType = "text/plain"
+                (part) => part.mimeType = "text/plain"
             )
-            if(parts){
-                content = Buffer.from(parts.body.data,"base64").toString("utf-8");
+            if (parts) {
+                content = Buffer.from(parts.body.data, "base64").toString("utf-8");
             }
-        }else{
+        } else {
             content = Buffer.from(payload.body.data, "base64").toString("utf-8");
         }
         const snippet = messageData.data.snippet
@@ -175,7 +179,6 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
     const messageReplied: string[] = [];
     for (const message of messageContents) {
         const analyzedResponse = await analyzeEmail(message.body || "");
-        console.log(analyzedResponse)
         const response: AnalyzedResponse = JSON.parse(analyzedResponse);
         const replyMail = response.replyMail;
         const extractedMailContent = response.extractedMailContent;
@@ -228,7 +231,7 @@ const fetchAndSendEmailGoogle = async (oauth2Client: any): Promise<any> => {
             }
         });
     }
-    return { message: messageReplied.length>0?"Success":"No New Mails", email: messageReplied.length > 0 ? messageReplied : ["No Mails"], replies: sentEmail.length > 0 ? sentEmail : ["No Mails"] };
+    return { message: messageReplied.length > 0 ? "Success" : "No New Mails", email: messageReplied.length > 0 ? messageReplied : ["No Mails"], replies: sentEmail.length > 0 ? sentEmail : ["No Mails"] };
 };
 
 const fetchAndSendEmailOutlook = async (graph: Client): Promise<any> => {

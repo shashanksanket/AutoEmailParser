@@ -6,7 +6,7 @@ import path from "path";
 import { google } from 'googleapis';
 import { Client } from '@microsoft/microsoft-graph-client';
 import cron from 'node-cron';
-import { fetchAndSendEmailGoogle, fetchAndSendEmailOutlook } from "./task";
+import { emailQueue } from './queue';
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -55,7 +55,7 @@ app.get("/auth/google/failure", (req, res) => {
 app.get(
     "/auth/outlook",
     passport.authenticate("microsoft", {
-        scope: ["user.read", "mail.read", "mail.send", "mail.ReadWrite","mailboxSettings.readWrite",""],
+        scope: ["user.read", "mail.read", "mail.send", "mail.ReadWrite", "mailboxSettings.readWrite", ""],
     })
 );
 
@@ -74,30 +74,9 @@ app.get("/auth/outlook/failure", (req, res) => {
 app.get("/auth/success/google", isLoggedin, async (req: RequestWithUser, res: express.Response) => {
     try {
         const accessToken = req.user.tokens.access_token;
-
-        const oauth2Client = new google.auth.OAuth2();
-        oauth2Client.setCredentials({ access_token: accessToken });
-        //Hit First Time
-        const response = await fetchAndSendEmailGoogle(oauth2Client)
-
-        //Then Go To Background Task
-        let cronjob:any;
-        cronjob = cron.schedule('*/30 * * * * *', async () => {
-            try {
-                const GoogleResponse = await fetchAndSendEmailGoogle(oauth2Client);
-                if (GoogleResponse.message == "No New Mails") {
-                    cronjob.stop();
-                    console.log('Stopping Background Task No Emails left to analyze:', GoogleResponse);
-                } else {
-                    console.log('Background task executed:', GoogleResponse);
-                }
-            } catch (error) {
-                console.error('Error executing background task:', error);
-            }
-        });
-
-        res.json(response);
-
+        const provider = "google"
+        emailQueue.add('sendEmail', { accessToken, provider },{repeat: {every: 10000}});
+        res.json("Job Started see terminal for updates");
     } catch (error) {
         console.error('Error fetching and analyzing emails:', error);
         res.status(500).send('Error fetching and analyzing emails');
@@ -107,30 +86,9 @@ app.get("/auth/success/google", isLoggedin, async (req: RequestWithUser, res: ex
 app.get("/auth/success/outlook", isLoggedin, async (req: RequestWithUser, res: express.Response) => {
     try {
         const accessToken = req.user.accessToken;
-        const graph = Client.init({
-            authProvider: (done) => {
-                done(null, accessToken);
-            },
-        });
-        //Hit First time:
-        const response = await fetchAndSendEmailOutlook(graph)
-
-        //Then Go To Background Task
-        let cronjob:any;
-        cronjob = cron.schedule('*/30 * * * * *', async () => {
-            try {
-                const outlookResponse = await fetchAndSendEmailOutlook(graph);
-                if (outlookResponse.message == "No New Mails") {
-                    cronjob.stop()
-                    console.log('Background task Is stopped no new mails to analyze', outlookResponse);
-                }
-                console.log('Background task executed:', outlookResponse);
-            } catch (error) {
-                console.error('Error executing background task:', error);
-            }
-        });
-        res.json(response);
-
+        const provider = "outlook"
+        emailQueue.add('sendEmail', { accessToken, provider },{repeat: {every: 10000}, removeOnComplete: true, removeOnFail: true});
+        res.json("Job Started see terminal for updates");
     } catch (error) {
         console.error('Error fetching and analyzing emails:', error);
         res.status(500).send('Error fetching and analyzing emails');
@@ -141,6 +99,9 @@ app.get("*", (req, res) => {
     res.sendFile('index.html', { root: path.join(__dirname) });
 });
 
-app.listen(5500, () => {
+app.listen(5500, async () => {
+    await emailQueue.clean(0, 999999);
+    await emailQueue.drain();
+    await emailQueue.obliterate({force:true});
     console.log("Server started");
 });
