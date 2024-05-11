@@ -1,15 +1,6 @@
-# ReachInbox.ai Email Assistant
+# Email Assistant
 
-Welcome to the ReachInbox.ai Email Assistant repository! This project serves as a demonstration of a task-based assignment completed as part of a job application for the Associate - Backend Engineer position at ReachInbox.ai.
-
-## Task Overview
-
-The task assigned was to build a tool capable of parsing and responding to emails from Google and Outlook accounts using AI. The tool needed to accomplish the following tasks:
-
-1. **OAuth Integration**: Set up OAuth authentication for accessing Google and Outlook email accounts securely.
-2. **Email Parsing**: Parse incoming emails, understand their context, and categorize them based on their content.
-3. **AI-Powered Response**: Utilize OpenAI to generate automated replies to emails based on their context.
-4. **Task Scheduling**: Implement background task scheduling using BullMQ to periodically fetch and process incoming emails.
+Welcome to the Email Assistant repository! 
 
 ## Technologies Used
 
@@ -32,7 +23,7 @@ To set up the project locally and explore its functionality, follow these steps:
 4. Run the application using `npm start`.
 5. Access the application by clickin index.html and open it using your web browser.
 
-## Task Completion
+## Features:
 
 - **OAuth Access Setup**: Implemented OAuth access for Google and Outlook accounts to securely connect to email accounts.
 - **Email Parsing and Categorization**: Developed functionality to parse and categorize emails based on their content.
